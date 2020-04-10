@@ -15,7 +15,7 @@ try:
 except IndexError:
     print('fix your file path around line 14')
 import carla
-from misc import get_speed
+from agents.tools.misc import get_speed
 import random
 import time
 
@@ -72,14 +72,14 @@ def longPID(vehicle):
     target_speed.x = 2.0
     target_speed.y = 2.0
     target_speed.z = 2.0
-    print(target_speed)
+    ##print(target_speed)
     #now do some math to convert this into a float value
     target_speed = 3.6 * math.sqrt(target_speed.x ** 2 + target_speed.y ** 2 + target_speed.z ** 2)
-    print('This is your target speed: {}'.format(target_speed))
+    ##print('This is your target speed: {}'.format(target_speed))
     #now we will do something similar to the current speed of the vehicle 
     current_speed = vehicle.get_velocity()
     current_speed = 3.6 * math.sqrt(current_speed.x ** 2 + current_speed.y ** 2 + current_speed.z ** 2)
-    print('This is your current speed: {}'.format(current_speed))
+    ##print('This is your current speed: {}'.format(current_speed))
 
     #now we will begin our PID control
     error = (target_speed-current_speed) #the error
@@ -95,7 +95,7 @@ def longPID(vehicle):
 
     #now the math for outputting a throttle value between zero and one
     controlled_throttle = np.clip((Kp * error) + (Kd * de / dt) + (Ki * ie * dt), 0.0, 1.0)
-    print('Your throttle value: {}'.format(controlled_throttle))
+    ##print('Your throttle value: {}'.format(controlled_throttle))
     #now we apply the throttle
     vehicle.apply_control(carla.VehicleControl(throttle=controlled_throttle, brake = 0.0))   
     #now ill add a sleep time just to see the number outputs better
@@ -103,10 +103,54 @@ def longPID(vehicle):
     # can always change it later
     time.sleep(.3) 
 
+def latPID(vehicle):
+    #set gain values
+    Kp = 1.0
+    Kd = 0.0
+    Ki = 0.0
+    #differential time
+    dt = 0.03
+    #this is the error array.. 
+    err_buffer = deque(maxlen=10)
 
+    #get the vehicle's current location
+    vehicle_transform = vehicle.get_transform()
+    v_begin = vehicle_transform.location
+    v_end = v_begin + carla.Location(x=math.cos(math.radians(vehicle_transform.rotation.yaw)),
+                                         y=math.sin(math.radians(vehicle_transform.rotation.yaw)))
 
+    v_vec = np.array([v_end.x - v_begin.x, v_end.y - v_begin.y, 0.0])
+
+    #get the location of the nearest waypoint that's in the center of the nearest driving lane
+    map = world.get_map()
+    waypoint = map.get_waypoint(vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving)
+    
+    
+    w_vec = np.array([waypoint.transform.location.x -
+                          v_begin.x, waypoint.transform.location.y -
+                          v_begin.y, 0.0])
+    
+    dot = math.acos(np.clip(np.dot(w_vec, v_vec) /
+                                 (np.linalg.norm(w_vec) * np.linalg.norm(v_vec)), -1.0, 1.0))
+
+    cross = np.cross(v_vec, w_vec)
+    if cross[2] < 0:
+            dot *= -1.0
+
+    err_buffer.append(dot)
+    if len(err_buffer) >= 2:
+        diff_error = (err_buffer[-1] - err_buffer[-2]) / dt
+        integral_error = sum(err_buffer) * dt
+    else:
+        diff_error = 0.0
+        integral_error = 0.0
+
+    controlled_steering = np.clip((Kp * dot) + (Kd * diff_error / dt) + (Ki * integral_error * dt), -1.0, 1.0)
+    vehicle.apply_control(carla.VehicleControl(steer=controlled_steering))
+    
 
 while go == True:
     longPID(vehicle)
+    latPID(vehicle)
 
 
