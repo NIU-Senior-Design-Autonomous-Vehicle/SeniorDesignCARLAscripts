@@ -60,7 +60,7 @@ def latPID(vehicle, world):
 
     cross = np.cross(v_vec, w_vec)
     if cross[2] < 0:
-            dot *= -1.0
+        dot *= -1.0
 
     err_buffer.append(dot)
     if len(err_buffer) >= 2:

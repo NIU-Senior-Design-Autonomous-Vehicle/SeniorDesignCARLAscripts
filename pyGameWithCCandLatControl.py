@@ -137,7 +137,7 @@ except ImportError:
 ############################ importing our longitudinal PID ######################################
 from LongPID2 import longPID
 
-############################ importing our longitudinal PID ######################################
+############################ importing our lateral PID ######################################
 from LatPID import latPID
 
 # ==============================================================================
@@ -304,7 +304,7 @@ class KeyboardControl(object):
     """Class that handles keyboard input."""
     def __init__(self, world, start_in_autopilot):
         self.cruiseControl = True #boolean for CC
-        self.lateralControl = True #boolean for lateral control
+        self.lateralControl = True #boolean for lateral control -- want autonomous lane keeping to be turned on
         self.player = vehicle #our vehicle variable!
         self._autopilot_enabled = start_in_autopilot
         if isinstance(world.player, carla.Vehicle):
@@ -446,6 +446,8 @@ class KeyboardControl(object):
                 # because then we can pass the vehicle to our PID module
                 # the rest of the arguments being passed in were there from the previous file
                 # yayayaayayayayya
+                ### Also need to pass in 'client' so that the lateral controller function can access the map of the world
+                ### to obtain the waypoints in the center of the lane
 
                 self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time(), world.player, client)
 
@@ -499,12 +501,13 @@ class KeyboardControl(object):
         self._steer_cache = min(0.7, max(-0.7, self._steer_cache))
         
         ##### implementing lane keeping #####
-        if self.lateralControl == True:
-            wrld = client.get_world()
-            self._control.steer = latPID(vehicle, wrld) 
-            print('lane keeping is working')
+        if self.lateralControl == True: #if statement to implement autonomous lateral control
+            wrld = client.get_world()   #first need to get the world to pass in to latPID control so that the map can be accessed
+            self._control.steer = latPID(vehicle, wrld) #set the returned steering value to the steering that controls the vehicle
         else:
-            self._control.steer = round(self._steer_cache, 1) ##original steering control command 
+            ##this was the original steering control command -- there was no if/else statement here before
+            ##originally this was the only line to control steering 
+            self._control.steer = round(self._steer_cache, 1) 
         
         self._control.brake = 1.0 if keys[K_DOWN] or keys[K_s] else 0.0
         self._control.hand_brake = keys[K_SPACE]
