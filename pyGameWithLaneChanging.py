@@ -503,16 +503,22 @@ class KeyboardControl(object):
         self._steer_cache = min(0.7, max(-0.7, self._steer_cache))
         
         #############       implementing lane keeping and lane changing       ###############
+        ### OKAY WHOOPS I just realized this morning that it does not change lanes as I thought it did. When I press
+        ### 'a', it does change into the left lane. HOWEVER, after a short period of time, it will autonomatically switch
+        ### back to the right lane and continue to switch between lanes in this manner. I always happened to press the 'd' key 
+        ### the same time the vehicle switched back into the right lane, so I didn't catch that right away. It's like the 
+        ### 'self.leftLaneChange' and 'self.rightLaneChange' need to be set back to false BUT not right away, because
+        ### then the vehicle looks like it's about to change lanes, but it never does -- this is because it takes time for 
+        ### the vehicle to switch lanes. There are a few instances where the vehicle is still heading into the adjacent 
+        ### lane, but not there yet. So the 'self.leftLaneChange' still needs to be set to True so that the waypoints
+        ### in the adjacent lane are being used to find the desired path, rather than the waypoints in the lane it is
+        ### currently in (but changing out of). I tried my best to explain here. Just let me know if I'm unclear  
         if keys[K_a]: #if key 'a' is pressed
-            #need to set leftLaneChange to True, while also making sure rightLaneChange is set to False otherwise
-            #the vehicle may continuously switch between lanes unprompted 
+            #need to set leftLaneChange to True
             self.leftLaneChange = True    
-            self.rightLaneChange = False 
         if keys[K_d]: #if key 'd' is pressed
-            #need to set rightLaneChange to True, while also making sure leftLaneChange is set to False otherwise
-            #the vehicle may continuously switch between lanes unprompted
+            #need to set rightLaneChange to True
             self.rightLaneChange = True  
-            self.leftLaneChange = False    
         if self.lateralControl == True: #if statement to implement autonomous lateral control
             #first need to get the world to pass in to latPID control so that the map can be accessed
             wrld = client.get_world()   
