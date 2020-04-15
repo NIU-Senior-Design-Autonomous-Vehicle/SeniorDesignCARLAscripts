@@ -28,11 +28,11 @@ import time
 
 ################# function for lat PID control ###########################################
 
-def latPID(vehicle, world):
+def latPID(vehicle, world, leftLaneChange, rightLaneChange):
     #set gain values
-    Kp = 0.2
+    Kp = 0.03
     Kd = 0.0
-    Ki = 0.0
+    Ki = 0.5
     #differential time
     dt = 0.03
     #this is the error array.. 
@@ -46,11 +46,32 @@ def latPID(vehicle, world):
 
     v_vec = np.array([v_end.x - v_begin.x, v_end.y - v_begin.y, 0.0])
 
-    #get the location of the nearest waypoint that's in the center of the nearest driving lane
+    ## Here we get the map and 'wypt' is set here only to pass into the 'get_left_lane' and 'get_right_lane'
+    ## if a lane change is set to occur. The 'wypt' just gets the nearest waypoint in the center of the current
+    ## driving lane. That way the 'get_left_lane' and 'get_right_lane' get the nearest waypoint in the 
+    ## adjacent lane. 
     map = world.get_map()
-    waypoint = map.get_waypoint(vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving)
+    wypt = map.get_waypoint(vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving)
     
-    
+
+    if leftLaneChange == False and rightLaneChange == False:
+        #if no lane change is set to occur, then get the location of the nearest waypoint that's in the center 
+        #of the nearest driving lane
+        waypoint = map.get_waypoint(vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving)
+    elif leftLaneChange == True:
+        #if want to change to the left lane, get the location of the nearest waypoint that's in the center of the
+        #adjacent driving lane to the left
+        waypoint = carla.Waypoint.get_left_lane(wypt)
+    elif rightLaneChange == True:
+        #if want to change to the right lane, get the location of the nearest waypoint that's in the center of the 
+        #adjacent driving lane to the right
+        #### okay since I've been loading Town02 before running this file, I needed to use 'get_left_lane' instead of
+        #### 'get_right_lane' to change back to right lane because if the vehicle is in the left lane, it's driving on the 
+        #### wrong side of the road, so technically if it were driving in the correct direction, the
+        #### adjacent lane is to the left
+        waypoint = carla.Waypoint.get_left_lane(wypt)
+
+
     w_vec = np.array([waypoint.transform.location.x -
                           v_begin.x, waypoint.transform.location.y -
                           v_begin.y, 0.0])
