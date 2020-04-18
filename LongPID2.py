@@ -20,11 +20,11 @@ import random
 import time
 
 
-# SPECIAL note: this is the same PID as LongPID.py but without changing the map 
-# and contacting the client and all that init setup bologna
-# basically, this method is just used to return a throttle value that will control the car
+go = True #boolean for running program
 
-# this PID needs to optimized too!
+error_buffer = deque(maxlen=30)
+    
+
 
 
 
@@ -33,14 +33,13 @@ import time
 def longPID(vehicle):
     
     #now we will set our gain values
-    Kp = 1.0
-    Kd = 0.0
-    Ki = 0.0
+    Kp = .3
+    Kd = .001
+    Ki = .05
     #differential time
     dt = 0.03
     #this is an error array of some sort, should look more into this
     #just using it because other people did 
-    error_buffer = deque(maxlen=30)
     
     #we need to generate a target speed
     #in Carla this is a 3D vector 
@@ -64,26 +63,32 @@ def longPID(vehicle):
     #now we will begin our PID control
     error = (target_speed-current_speed) #the error
     error_buffer.append(error)#add it to the list
+    print(error_buffer)
 
     if len(error_buffer) >= 2: #if we have more than two error values
-        de = (error_buffer[-1] - error_buffer[-2]) / dt #math for differential error
-        ie = sum(error_buffer) * dt #math for integral error
+        de = (error_buffer[-1] - error_buffer[-2]) /dt #math for differential error
+        ie = sum(error_buffer)*dt #math for integral error
     else: #otherwise set these values to zero
         de = 0.0
         ie = 0.0
     #we do the above so we dont start off right away with crazy errors
-
+    print(de)
+    print(ie)
     #now the math for outputting a throttle value between zero and one
-    controlled_throttle = np.clip((Kp * error) + (Kd * de / dt) + (Ki * ie * dt), 0.0, 1.0)
+    controlled_throttle = np.clip((Kp * error) + (Kd * de/dt) + (Ki * ie*dt ), 0.3, 0.7)
     print('Your throttle value: {}'.format(controlled_throttle))
-    return controlled_throttle # NEW!!!!!!!!!!!!!!!!!! return a throttle value to be used.
+    return controlled_throttle
     #now we apply the throttle
     #vehicle.apply_control(carla.VehicleControl(throttle=controlled_throttle, brake = 0.0))   
     #now ill add a sleep time just to see the number outputs better
     # this will hinder performance of the PID controller though 
     # can always change it later
-    #time.sleep(.3) 
+   # time.sleep(.3) 
 
 
+
+
+  #  while go == True:
+        #longPID(vehicle)
 
 

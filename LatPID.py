@@ -27,16 +27,16 @@ import time
 
 
 ################# function for lat PID control ###########################################
-
+err_buffer = deque(maxlen=10)
 def latPID(vehicle, world, leftLaneChange, rightLaneChange):
     #set gain values
-    Kp = 0.03
-    Kd = 0.0
-    Ki = 0.5
+    Kp = .3 #.2
+    Kd = .001  #1
+    Ki = .05 #.03
     #differential time
     dt = 0.03
     #this is the error array.. 
-    err_buffer = deque(maxlen=10)
+    
 
     #get the vehicle's current location
     vehicle_transform = vehicle.get_transform()
@@ -93,6 +93,6 @@ def latPID(vehicle, world, leftLaneChange, rightLaneChange):
 
     controlled_steering = np.clip((Kp * dot) + (Kd * diff_error / dt) + (Ki * integral_error * dt), -1.0, 1.0)
   
-    time.sleep(.3)
+    #time.sleep(.3)
 
     return controlled_steering

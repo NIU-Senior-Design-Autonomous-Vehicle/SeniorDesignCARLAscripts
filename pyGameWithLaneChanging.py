@@ -169,10 +169,11 @@ class World(object):
     
     def __init__(self, carla_world, hud, args):
         
-
+        self.client = carla.Client('localhost', 2000)
         self.world = carla_world
         self.actor_role_name = args.rolename
         try:
+            carla_world = self.client.load_world('Town02') #load world two on start!
             self.map = self.world.get_map()
         except RuntimeError as error:
             print('RuntimeError: {}'.format(error))
@@ -236,7 +237,8 @@ class World(object):
                 print('Please add some Vehicle Spawn Point to your UE4 scene.')
                 sys.exit(1)
             spawn_points = self.map.get_spawn_points()
-            spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
+            #spawn in specific spot 
+            spawn_point = spawn_points[1] if spawn_points else carla.Transform()
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
             vehicle = self.player #set global variable 'vehicle' to our spawned player
 
@@ -1148,7 +1150,8 @@ def main():
     argparser.add_argument(
         '--filter',
         metavar='PATTERN',
-        default='vehicle.*',
+        #spawn specific vehicle
+        default='vehicle.lincoln.*',
         help='actor filter (default: "vehicle.*")')
     argparser.add_argument(
         '--rolename',
