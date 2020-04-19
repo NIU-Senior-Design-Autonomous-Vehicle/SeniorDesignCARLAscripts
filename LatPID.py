@@ -70,13 +70,25 @@ def latPID(vehicle, world, laneChange, count, x_desiredPath, y_desiredPath, x_ac
         waypoint = carla.Waypoint.get_left_lane(wypt)
 
         #need to collect the coordinates for the desired and actual paths for plotting
-        x_desiredPath.append(waypoint.transform.location.x)
-        y_desiredPath.append(waypoint.transform.location.y)
-        x_actualPath.append(v_begin.x)
-        y_actualPath.append(v_begin.y)
+        ## So basically we technically only grab the waypoint in the left lane (the lane the vehicle switches into) a couple times before we grab the waypoints for the right lane again
+        ## The vehicle drives in the left lane slightly longer than those couple points that we grab, though, so while we are still driving in the left lane,
+        ## we say that the desired path is still in that left lane (defined by location stored in wypt -- part of the else statement) until the vehicle crosses back into the right lane.
+        ## That 'count' is approximately when the car crosses back into the right lane. If the plot for the desired path is funky, probably just need to mess with the 'count' number.
+        if count > 39:
+            x_desiredPath.append(waypoint.transform.location.x)
+            y_desiredPath.append(waypoint.transform.location.y)
+            x_actualPath.append(v_begin.x)
+            y_actualPath.append(v_begin.y)
+        else:
+            x_desiredPath.append(wypt.transform.location.x)
+            y_desiredPath.append(wypt.transform.location.y)
+            x_actualPath.append(v_begin.x)
+            y_actualPath.append(v_begin.y)
 
         count  = count + 1
-        if count == 40:
+        ## this 'count' is set so that 'laneChange' is set back to false so that the vehicle does not oscillate between the left and right lanes. This number can affect how well the vehicle
+        ## changes lane. If it swerves really bad when it changes lanes, the 'count' for when to stop the laneChange may change how it behaves. 
+        if count == 42:
             laneChange = False
 
     w_vec = np.array([waypoint.transform.location.x -
