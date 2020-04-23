@@ -28,14 +28,15 @@ import time
 
 ################# function for lat PID control ###########################################
 err_buffer = deque(maxlen=10)
-def latPID(vehicle, world, laneChange, count, x_desiredPath, y_desiredPath, x_actualPath, y_actualPath):
+def latPID(vehicle, world, leftLaneChange, rightLaneChange):
     #set gain values
-    Kp = .3 #.2
+    Kp = .2 #.2
     Kd = .001  #1
     Ki = .05 #.03
     #differential time
     dt = 0.03
-   
+    #this is the error array.. 
+    
 
     #get the vehicle's current location
     vehicle_transform = vehicle.get_transform()
@@ -52,44 +53,24 @@ def latPID(vehicle, world, laneChange, count, x_desiredPath, y_desiredPath, x_ac
     map = world.get_map()
     wypt = map.get_waypoint(vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving)
     
-    if laneChange == False:
+
+    if leftLaneChange == False and rightLaneChange == False:
         #if no lane change is set to occur, then get the location of the nearest waypoint that's in the center 
         #of the nearest driving lane
         waypoint = map.get_waypoint(vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving)
-
-        #need to collect the coordinates for the desired and actual paths for plotting
-        x_desiredPath.append(waypoint.transform.location.x)
-        y_desiredPath.append(waypoint.transform.location.y)
-        x_actualPath.append(v_begin.x)
-        y_actualPath.append(v_begin.y)
-
-
-    elif laneChange == True:
+    elif leftLaneChange == True:
         #if want to change to the left lane, get the location of the nearest waypoint that's in the center of the
         #adjacent driving lane to the left
         waypoint = carla.Waypoint.get_left_lane(wypt)
+    elif rightLaneChange == True:
+        #if want to change to the right lane, get the location of the nearest waypoint that's in the center of the 
+        #adjacent driving lane to the right
+        #### okay since I've been loading Town02 before running this file, I needed to use 'get_left_lane' instead of
+        #### 'get_right_lane' to change back to right lane because if the vehicle is in the left lane, it's driving on the 
+        #### wrong side of the road, so technically if it were driving in the correct direction, the
+        #### adjacent lane is to the left
+        waypoint = carla.Waypoint.get_right_lane(wypt)
 
-        #need to collect the coordinates for the desired and actual paths for plotting
-        ## So basically we technically only grab the waypoint in the left lane (the lane the vehicle switches into) a couple times before we grab the waypoints for the right lane again
-        ## The vehicle drives in the left lane slightly longer than those couple points that we grab, though, so while we are still driving in the left lane,
-        ## we say that the desired path is still in that left lane (defined by location stored in wypt -- part of the else statement) until the vehicle crosses back into the right lane.
-        ## That 'count' is approximately when the car crosses back into the right lane. If the plot for the desired path is funky, probably just need to mess with the 'count' number.
-        if count > 39:
-            x_desiredPath.append(waypoint.transform.location.x)
-            y_desiredPath.append(waypoint.transform.location.y)
-            x_actualPath.append(v_begin.x)
-            y_actualPath.append(v_begin.y)
-        else:
-            x_desiredPath.append(wypt.transform.location.x)
-            y_desiredPath.append(wypt.transform.location.y)
-            x_actualPath.append(v_begin.x)
-            y_actualPath.append(v_begin.y)
-
-        count  = count + 1
-        ## this 'count' is set so that 'laneChange' is set back to false so that the vehicle does not oscillate between the left and right lanes. This number can affect how well the vehicle
-        ## changes lane. If it swerves really bad when it changes lanes, the 'count' for when to stop the laneChange may change how it behaves. 
-        if count == 42:
-            laneChange = False
 
     w_vec = np.array([waypoint.transform.location.x -
                           v_begin.x, waypoint.transform.location.y -
@@ -110,8 +91,8 @@ def latPID(vehicle, world, laneChange, count, x_desiredPath, y_desiredPath, x_ac
         diff_error = 0.0
         integral_error = 0.0
 
-    controlled_steering = np.clip((Kp * dot) + (Kd * diff_error / dt) + (Ki * integral_error * dt), -1.0, 1.0)
+    controlled_steering = np.clip((Kp * dot) + (Kd * diff_error / dt) + (Ki * integral_error * dt), -0.3, 0.3)
   
     #time.sleep(.3)
 
-    return controlled_steering, laneChange, count, x_desiredPath, y_desiredPath, x_actualPath, y_actualPath
+    return controlled_steering

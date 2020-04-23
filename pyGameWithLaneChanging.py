@@ -62,6 +62,7 @@ from collections import deque
 import glob
 import os
 import sys
+import time
 
 try:
     #fix per '/spawn_npc.py'
@@ -173,7 +174,7 @@ class World(object):
         self.world = carla_world
         self.actor_role_name = args.rolename
         try:
-            carla_world = self.client.load_world('Town02') #load world two on start!
+            carla_world = self.client.load_world('Town03') #load world two on start!
             self.map = self.world.get_map()
         except RuntimeError as error:
             print('RuntimeError: {}'.format(error))
@@ -238,7 +239,7 @@ class World(object):
                 sys.exit(1)
             spawn_points = self.map.get_spawn_points()
             #spawn in specific spot 
-            spawn_point = spawn_points[1] if spawn_points else carla.Transform()
+            spawn_point = spawn_points[3] if spawn_points else carla.Transform()
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
             vehicle = self.player #set global variable 'vehicle' to our spawned player
 
@@ -301,23 +302,14 @@ class World(object):
 # -- KeyboardControl -----------------------------------------------------------
 # ==============================================================================
 
-#need to define variable for the desired and actual paths for plotting at the end
-x_desiredPath = []
-y_desiredPath = []
-x_actualPath = []
-y_actualPath = []
 
 class KeyboardControl(object):
     """Class that handles keyboard input."""
     def __init__(self, world, start_in_autopilot):
         self.cruiseControl = True #boolean for CC
         self.lateralControl = True #boolean for lateral control -- want autonomous lane keeping to be turned on
-        self.laneChange = False #boolean for changing switching into left lane and then back into right -- only activated when 'a' key is pressed
-        self.count = 0 #this count is for knowing when the vehicle should set 'self.laneChange' to False after it has been set True
-        self.x_desiredPath = [] ##I could confused how the global/local variables worked, and I needed to declare these desired and 
-        self.y_desiredPath = [] ## actual path variables here to pass into the latPID function 
-        self.x_actualPath = []
-        self.y_actualPath = []
+        self.leftLaneChange = False #boolean for changing into left lane -- only activated when 'a' key is pressed
+        self.rightLaneChange = False #boolean for changing into right lane -- only activated when 'd' key is pressed
         self.player = vehicle #our vehicle variable!
         self._autopilot_enabled = start_in_autopilot
         if isinstance(world.player, carla.Vehicle):
@@ -483,6 +475,7 @@ class KeyboardControl(object):
             world.player.apply_control(self._control)
 
     def _parse_vehicle_keys(self, keys, milliseconds, vehicle, client):
+        wrld = client.get_world()
         ### now implementing the cruise control #####
         if keys[K_w] or keys[K_UP]: #if 'w' or up key is pressed
             self.cruiseControl = True #boolean variable is set to true
@@ -514,29 +507,33 @@ class KeyboardControl(object):
         self._steer_cache = min(0.7, max(-0.7, self._steer_cache))
         
         #############       implementing lane keeping and lane changing       ###############
+        ### OKAY WHOOPS I just realized this morning that it does not change lanes as I thought it did. When I press
+        ### 'a', it does change into the left lane. HOWEVER, after a short period of time, it will autonomatically switch
+        ### back to the right lane and continue to switch between lanes in this manner. I always happened to press the 'd' key 
+        ### the same time the vehicle switched back into the right lane, so I didn't catch that right away. It's like the 
+        ### 'self.leftLaneChange' and 'self.rightLaneChange' need to be set back to false BUT not right away, because
+        ### then the vehicle looks like it's about to change lanes, but it never does -- this is because it takes time for 
+        ### the vehicle to switch lanes. There are a few instances where the vehicle is still heading into the adjacent 
+        ### lane, but not there yet. So the 'self.leftLaneChange' still needs to be set to True so that the waypoints
+        ### in the adjacent lane are being used to find the desired path, rather than the waypoints in the lane it is
+        ### currently in (but changing out of). I tried my best to explain here. Just let me know if I'm unclear  
         if keys[K_a]: #if key 'a' is pressed
             #need to set leftLaneChange to True
-            self.count = 0
-            self.laneChange = True    
+            self.leftLaneChange = True  
+        if not keys[K_a]:
+            self.leftLaneChange = False    
+            
+        if keys[K_d]: #if key 'd' is pressed
+            #need to set rightLaneChange to True
+            self.rightLaneChange = True 
+        if not keys[K_d]:
+            self.rightLaneChange = False     
+         
         if self.lateralControl == True: #if statement to implement autonomous lateral control
             #first need to get the world to pass in to latPID control so that the map can be accessed
-            wrld = client.get_world()   
+            
             #set the returned steering value to the steering that controls the vehicle
-
-            #need to make desired and actual paths global
-            global x_desiredPath 
-            global y_desiredPath 
-            global x_actualPath 
-            global y_actualPath
-
-            self._control.steer, self.laneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath = latPID(vehicle, wrld, self.laneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath) 
-
-            #need to store the coordinates in the desire and actual path variables
-            x_desiredPath = self.x_desiredPath
-            y_desiredPath = self.y_desiredPath
-            x_actualPath = self.x_actualPath
-            y_actualPath = self.y_actualPath
-
+            self._control.steer = latPID(vehicle, wrld, self.leftLaneChange, self.rightLaneChange) 
         else:
             ##this was the original steering control command -- there was no if/else statement here before
             ##originally this was the only line to control steering 
@@ -1197,15 +1194,3 @@ if __name__ == '__main__':
     
     main()
     
-from matplotlib import pyplot as plt 
-
-## this code plots the coordinates for the desired and actual paths
-fig = plt.figure()
-plot = plt.subplot(111)
-plt.title("Desired Path vs Actual Path")
-plt.xlabel("x-coordinate")
-plt.ylabel("y-coordinate")
-plot.plot(x_desiredPath,y_desiredPath, 'k', linewidth = 2, label = 'Desired Path')
-plot.plot(x_actualPath,y_actualPath, '--r',label = 'Actual Path',)
-plot.legend()
-plt.show()
