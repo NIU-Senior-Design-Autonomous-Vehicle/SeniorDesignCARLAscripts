@@ -25,14 +25,15 @@ import time
 # this PID needs to optimized too!
 
 
-
 ################# function for lat PID control ###########################################
 err_buffer = deque(maxlen=10)
-def latPID(vehicle, world, leftLaneChange, rightLaneChange):
+def latPID(vehicle, world, leftLaneChange, rightLaneChange, count, x_desiredPath, y_desiredPath, x_actualPath, y_actualPath):
+    
+
     #set gain values
-    Kp = .2 #.2
-    Kd = .001  #1
-    Ki = .05 #.03
+    Kp = .08 #.2
+    Kd = .0005  #1
+    Ki = .04 #.03
     #differential time
     dt = 0.03
     #this is the error array.. 
@@ -45,7 +46,7 @@ def latPID(vehicle, world, leftLaneChange, rightLaneChange):
                                          y=math.sin(math.radians(vehicle_transform.rotation.yaw)))
 
     v_vec = np.array([v_end.x - v_begin.x, v_end.y - v_begin.y, 0.0])
-
+   
     ## Here we get the map and 'wypt' is set here only to pass into the 'get_left_lane' and 'get_right_lane'
     ## if a lane change is set to occur. The 'wypt' just gets the nearest waypoint in the center of the current
     ## driving lane. That way the 'get_left_lane' and 'get_right_lane' get the nearest waypoint in the 
@@ -58,10 +59,18 @@ def latPID(vehicle, world, leftLaneChange, rightLaneChange):
         #if no lane change is set to occur, then get the location of the nearest waypoint that's in the center 
         #of the nearest driving lane
         waypoint = map.get_waypoint(vehicle.get_location(),project_to_road=True, lane_type=carla.LaneType.Driving)
+        x_desiredPath.append(waypoint.transform.location.x)
+        y_desiredPath.append(waypoint.transform.location.y)
+        x_actualPath.append(v_begin.x)
+        y_actualPath.append(v_begin.y)
     elif leftLaneChange == True:
         #if want to change to the left lane, get the location of the nearest waypoint that's in the center of the
         #adjacent driving lane to the left
         waypoint = carla.Waypoint.get_left_lane(wypt)
+        x_desiredPath.append(waypoint.transform.location.x)
+        y_desiredPath.append(waypoint.transform.location.y)
+        x_actualPath.append(v_begin.x)
+        y_actualPath.append(v_begin.y)
     elif rightLaneChange == True:
         #if want to change to the right lane, get the location of the nearest waypoint that's in the center of the 
         #adjacent driving lane to the right
@@ -70,11 +79,16 @@ def latPID(vehicle, world, leftLaneChange, rightLaneChange):
         #### wrong side of the road, so technically if it were driving in the correct direction, the
         #### adjacent lane is to the left
         waypoint = carla.Waypoint.get_right_lane(wypt)
-
-
+        x_desiredPath.append(waypoint.transform.location.x)
+        y_desiredPath.append(waypoint.transform.location.y)
+        x_actualPath.append(v_begin.x)
+        y_actualPath.append(v_begin.y)
+        print(waypoint)
+        
+ 
     w_vec = np.array([waypoint.transform.location.x -
-                          v_begin.x, waypoint.transform.location.y -
-                          v_begin.y, 0.0])
+                    v_begin.x, waypoint.transform.location.y -
+                    v_begin.y, 0.0])
     
     dot = math.acos(np.clip(np.dot(w_vec, v_vec) /
                                  (np.linalg.norm(w_vec) * np.linalg.norm(v_vec)), -1.0, 1.0))
@@ -95,4 +109,4 @@ def latPID(vehicle, world, leftLaneChange, rightLaneChange):
   
     #time.sleep(.3)
 
-    return controlled_steering
+    return controlled_steering, leftLaneChange, rightLaneChange, count, x_desiredPath, y_desiredPath, x_actualPath, y_actualPath
