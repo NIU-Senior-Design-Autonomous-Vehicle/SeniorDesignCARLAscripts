@@ -326,6 +326,11 @@ class KeyboardControl(object):
         self.lateralControl = True #boolean for lateral control -- want autonomous lane keeping to be turned on
         self.leftLaneChange = False #boolean for changing into left lane -- only activated when 'a' key is pressed
         self.rightLaneChange = False #boolean for changing into right lane -- only activated when 'd' key is pressed
+        self.count = 0 #this count is for knowing when the vehicle should set 'self.laneChange' to False after it has been set True
+        self.x_desiredPath = [] ##I could confused how the global/local variables worked, and I needed to declare these desired and 
+        self.y_desiredPath = [] ## actual path variables here to pass into the latPID function 
+        self.x_actualPath = []
+        self.y_actualPath = []
         self.player = vehicle #our vehicle variable!
         self.count = 0 #this count is for knowing when the vehicle should set 'self.laneChange' to False after it has been set True
         self.x_desiredPath = [] ##I could confused how the global/local variables worked, and I needed to declare these desired and 
@@ -543,15 +548,19 @@ class KeyboardControl(object):
         if keys[K_a]: #if key 'a' is pressed
             #need to set leftLaneChange to True
             self.leftLaneChange = True  
+
         #if not keys[K_a]:
         #    self.leftLaneChange = False    
+
             
         if keys[K_d]: #if key 'd' is pressed
             #need to set rightLaneChange to True
             self.rightLaneChange = True 
+
         #if not keys[K_d]:
          #   self.rightLaneChange = False     
          
+
         if self.lateralControl == True: #if statement to implement autonomous lateral control
             #first need to get the world to pass in to latPID control so that the map can be accessed
             #self._control.steer = latPID(vehicle, world.world, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath) 
@@ -600,6 +609,21 @@ class KeyboardControl(object):
                 ##
             print(self.rightLaneChange)
             
+
+            ##need to make desired and actual paths global
+            #global x_desiredPath 
+            #global y_desiredPath 
+            #global x_actualPath 
+            #global y_actualPath
+
+            #self._control.steer, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath = latPID(vehicle, wrld, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath) 
+
+            #need to store the coordinates in the desire and actual path variables
+            #x_desiredPath = self.x_desiredPath
+            #y_desiredPath = self.y_desiredPath
+            #x_actualPath = self.x_actualPath
+            #y_actualPath = self.y_actualPath
+
         else:
             ##this was the original steering control command -- there was no if/else statement here before
             ##originally this was the only line to control steering 
@@ -1301,7 +1325,6 @@ if __name__ == '__main__':
     
     main()
 
-
 from matplotlib import pyplot as plt 
 
 ## this code plots the coordinates for the desired and actual paths
@@ -1313,4 +1336,6 @@ plt.ylabel("y-coordinate")
 plot.plot(x_desiredPath,y_desiredPath, 'k', linewidth = 2, label = 'Desired Path')
 plot.plot(x_actualPath,y_actualPath, '--r',label = 'Actual Path',)
 plot.legend()
+
 plt.show() 
+
