@@ -140,7 +140,7 @@ from LongPID2 import longPID
 
 ############################ importing our lateral PID ######################################
 from LatPID import latPID
-
+from obs import obs
 # ==============================================================================
 # -- Global functions ----------------------------------------------------------
 # ==============================================================================
@@ -164,8 +164,6 @@ def get_actor_display_name(actor, truncate=250):
 
 #global variable vehicle will be used to pass the vehicle into our longPID!!
 vehicle = None
-
-
 class World(object):
     
     def __init__(self, carla_world, hud, args):
@@ -176,6 +174,7 @@ class World(object):
         try:
             carla_world = self.client.load_world('Town03') #load world two on start!
             self.map = self.world.get_map()
+            obs()
         except RuntimeError as error:
             print('RuntimeError: {}'.format(error))
             print('  The server could not send the OpenDRIVE (.xodr) file:')
@@ -189,6 +188,7 @@ class World(object):
         self.gnss_sensor = None
         self.imu_sensor = None
         self.radar_sensor = None
+        self.object_sensor = None
         self.camera_manager = None
         self._weather_presets = find_weather_presets()
         self._weather_index = 0
@@ -229,6 +229,7 @@ class World(object):
             spawn_point.rotation.roll = 0.0
             spawn_point.rotation.pitch = 0.0
             self.destroy()
+            obs.destroy()
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
             vehicle = self.player #set global variable 'vehicle' to our spawned player
             
@@ -240,14 +241,17 @@ class World(object):
             spawn_points = self.map.get_spawn_points()
             #spawn in specific spot 
             spawn_point = spawn_points[3] if spawn_points else carla.Transform()
+            
+            
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
             vehicle = self.player #set global variable 'vehicle' to our spawned player
-
+            
         # Set up the sensors.
         self.collision_sensor = CollisionSensor(self.player, self.hud)
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
         self.gnss_sensor = GnssSensor(self.player)
         self.imu_sensor = IMUSensor(self.player)
+        self.object_sensor = ObjectDet(self.player)
         self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
         self.camera_manager.transform_index = cam_pos_index
         self.camera_manager.set_sensor(cam_index, notify=False)
@@ -263,6 +267,13 @@ class World(object):
         preset = self._weather_presets[self._weather_index]
         self.hud.notification('Weather: %s' % preset[1])
         self.player.get_world().set_weather(preset[0])
+
+    def toggleObjectDet(self):
+        if self.object_sensor is None:
+            self.object_sensor = ObjectDet(self.player)
+        elif self.object_sensor.sensor is not None:
+            self.object_sensor.sensor.destroy()
+            self.object_sensor = None
 
     def toggle_radar(self):
         if self.radar_sensor is None:
@@ -310,6 +321,7 @@ y_actualPath = []
 class KeyboardControl(object):
     """Class that handles keyboard input."""
     def __init__(self, world, start_in_autopilot):
+        self.hi = 1
         self.cruiseControl = True #boolean for CC
         self.lateralControl = True #boolean for lateral control -- want autonomous lane keeping to be turned on
         self.leftLaneChange = False #boolean for changing into left lane -- only activated when 'a' key is pressed
@@ -320,6 +332,11 @@ class KeyboardControl(object):
         self.x_actualPath = []
         self.y_actualPath = []
         self.player = vehicle #our vehicle variable!
+        self.count = 0 #this count is for knowing when the vehicle should set 'self.laneChange' to False after it has been set True
+        self.x_desiredPath = [] ##I could confused how the global/local variables worked, and I needed to declare these desired and 
+        self.y_desiredPath = [] ## actual path variables here to pass into the latPID function 
+        self.x_actualPath = []
+        self.y_actualPath = []
         self._autopilot_enabled = start_in_autopilot
         if isinstance(world.player, carla.Vehicle):
             self._control = carla.VehicleControl()
@@ -463,7 +480,7 @@ class KeyboardControl(object):
                 ### Also need to pass in 'client' so that the lateral controller function can access the map of the world
                 ### to obtain the waypoints in the center of the lane
 
-                self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time(), world.player, client)
+                self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time(), world.player, client,world)
 
                 ##############HUGE################################
 
@@ -483,7 +500,9 @@ class KeyboardControl(object):
                 self._parse_walker_keys(pygame.key.get_pressed(), clock.get_time(), world)
             world.player.apply_control(self._control)
 
-    def _parse_vehicle_keys(self, keys, milliseconds, vehicle, client):
+    def _parse_vehicle_keys(self, keys, milliseconds, vehicle, client, world):
+        
+        
         wrld = client.get_world()
         ### now implementing the cruise control #####
         if keys[K_w] or keys[K_UP]: #if 'w' or up key is pressed
@@ -530,19 +549,23 @@ class KeyboardControl(object):
             #need to set leftLaneChange to True
             self.leftLaneChange = True  
 
-        if not keys[K_a]:
-            self.leftLaneChange = False    
+        #if not keys[K_a]:
+        #    self.leftLaneChange = False    
+
             
         if keys[K_d]: #if key 'd' is pressed
             #need to set rightLaneChange to True
             self.rightLaneChange = True 
 
-        if not keys[K_d]:
-            self.rightLaneChange = False     
-          
+        #if not keys[K_d]:
+         #   self.rightLaneChange = False     
+         
+
         if self.lateralControl == True: #if statement to implement autonomous lateral control
             #first need to get the world to pass in to latPID control so that the map can be accessed
-            
+            #self._control.steer = latPID(vehicle, world.world, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath) 
+
+
             #need to make desired and actual paths global
             global x_desiredPath 
             global y_desiredPath 
@@ -556,14 +579,64 @@ class KeyboardControl(object):
             y_desiredPath = self.y_desiredPath
             x_actualPath = self.x_actualPath
             y_actualPath = self.y_actualPath
+            
+            t = world.player.get_transform()
+            v = world.player.get_velocity()
+            c = world.player.get_control()
+            distance = lambda l: math.sqrt((l.x - t.location.x)**2 + (l.y - t.location.y)**2 + (l.z - t.location.z)**2)
+            vehicles = world.world.get_actors().filter('vehicle.*')
+            vehicles = [(distance(x.get_location()), x) for x in vehicles if x.id != world.player.id]
+            print("dylan drake.....................................")
+            print(vehicles)
+            
+            print(self.hi)
+            for d, vehicle in sorted(vehicles):
+                if d > 200.0:
+                    break
+                print(d)
+                #lets try it 
+                print(self.hi)
+                if d < 15 and d > 8 and self.hi%2 ==1:
+                    self.rightLaneChange = True
+                    self.hi +=1
+                    print(self.hi)
+                    print('lane change initiated!!')
+                    print(self.rightLaneChange)
+                elif d < 6:
+                    self.rightLaneChange = False   
+                    
+                
+                ##
+            print(self.rightLaneChange)
+            
+
+            ##need to make desired and actual paths global
+            #global x_desiredPath 
+            #global y_desiredPath 
+            #global x_actualPath 
+            #global y_actualPath
+
+            #self._control.steer, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath = latPID(vehicle, wrld, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath) 
+
+            #need to store the coordinates in the desire and actual path variables
+            #x_desiredPath = self.x_desiredPath
+            #y_desiredPath = self.y_desiredPath
+            #x_actualPath = self.x_actualPath
+            #y_actualPath = self.y_actualPath
+
         else:
             ##this was the original steering control command -- there was no if/else statement here before
             ##originally this was the only line to control steering 
             self._control.steer = round(self._steer_cache, 1) 
+
+    
         
         self._control.brake = 1.0 if keys[K_DOWN] or keys[K_s] else 0.0
         self._control.hand_brake = keys[K_SPACE]
-        
+
+   
+
+
     def _parse_walker_keys(self, keys, milliseconds, world):
         self._control.speed = 0.0
         if keys[K_DOWN] or keys[K_s]:
@@ -594,6 +667,7 @@ class KeyboardControl(object):
 
 class HUD(object):
     def __init__(self, width, height):
+    
         self.dim = (width, height)
         font = pygame.font.Font(pygame.font.get_default_font(), 20)
         font_name = 'courier' if os.name == 'nt' else 'mono'
@@ -618,6 +692,7 @@ class HUD(object):
         self.simulation_time = timestamp.elapsed_seconds
 
     def tick(self, world, clock):
+        
         self._notifications.tick(world, clock)
         if not self._show_info:
             return
@@ -672,10 +747,15 @@ class HUD(object):
         if len(vehicles) > 1:
             self._info_text += ['Nearby vehicles:']
             distance = lambda l: math.sqrt((l.x - t.location.x)**2 + (l.y - t.location.y)**2 + (l.z - t.location.z)**2)
+            
+            
             vehicles = [(distance(x.get_location()), x) for x in vehicles if x.id != world.player.id]
+           
             for d, vehicle in sorted(vehicles):
                 if d > 200.0:
                     break
+                
+                
                 vehicle_type = get_actor_display_name(vehicle, truncate=22)
                 self._info_text.append('% 4dm %s' % (d, vehicle_type))
 
@@ -918,6 +998,35 @@ class IMUSensor(object):
             max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.y))),
             max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.z))))
         self.compass = math.degrees(sensor_data.compass)
+
+#object detection sensor!!!!##################################################################
+
+
+class ObjectDet(object):
+    def __init__(self, parent_actor):
+        self.sensor = None
+        self._parent = parent_actor
+        world = self._parent.get_world()
+        self.debug = world.debug
+        bp = world.get_blueprint_library().find('sensor.other.obstacle')
+        self.sensor = world.spawn_actor(
+            bp,
+            carla.Transform(
+                carla.Location(x=3.0, z=2.0)),
+                #carla.Rotation(pitch=5)),
+            attach_to=self._parent)
+        # We need a weak reference to self to avoid circular reference.
+        weak_self = weakref.ref(self)
+       
+        print("sensor is created!")
+    
+        def object_callback(event):
+            obstacle = self.sensor.other_actor
+            print("obstacle is......")
+            print(obstacle)
+
+        self.sensor.listen(object_callback)
+      
 
 
 # ==============================================================================
@@ -1215,7 +1324,7 @@ def main():
 if __name__ == '__main__':
     
     main()
-    
+
 from matplotlib import pyplot as plt 
 
 ## this code plots the coordinates for the desired and actual paths
@@ -1227,4 +1336,6 @@ plt.ylabel("y-coordinate")
 plot.plot(x_desiredPath,y_desiredPath, 'k', linewidth = 2, label = 'Desired Path')
 plot.plot(x_actualPath,y_actualPath, '--r',label = 'Actual Path',)
 plot.legend()
-plt.show()
+
+plt.show() 
+
