@@ -164,6 +164,8 @@ def get_actor_display_name(actor, truncate=250):
 
 #global variable vehicle will be used to pass the vehicle into our longPID!!
 vehicle = None
+vehicle_location_x = []
+vehicle_location_y = []
 class World(object):
     
     def __init__(self, carla_world, hud, args):
@@ -174,7 +176,10 @@ class World(object):
         try:
             carla_world = self.client.load_world('Town03') #load world two on start!
             self.map = self.world.get_map()
-            obs()
+
+            global vehicle_location_x
+            global vehicle_location_y
+            vehicle_location_x, vehicle_location_y = obs()
         except RuntimeError as error:
             print('RuntimeError: {}'.format(error))
             print('  The server could not send the OpenDRIVE (.xodr) file:')
@@ -332,11 +337,6 @@ class KeyboardControl(object):
         self.x_actualPath = []
         self.y_actualPath = []
         self.player = vehicle #our vehicle variable!
-        self.count = 0 #this count is for knowing when the vehicle should set 'self.laneChange' to False after it has been set True
-        self.x_desiredPath = [] ##I could confused how the global/local variables worked, and I needed to declare these desired and 
-        self.y_desiredPath = [] ## actual path variables here to pass into the latPID function 
-        self.x_actualPath = []
-        self.y_actualPath = []
         self._autopilot_enabled = start_in_autopilot
         if isinstance(world.player, carla.Vehicle):
             self._control = carla.VehicleControl()
@@ -551,16 +551,14 @@ class KeyboardControl(object):
 
         #if not keys[K_a]:
         #    self.leftLaneChange = False    
-
             
         if keys[K_d]: #if key 'd' is pressed
             #need to set rightLaneChange to True
             self.rightLaneChange = True 
 
         #if not keys[K_d]:
-         #   self.rightLaneChange = False     
-         
-
+        #    self.rightLaneChange = False     
+          
         if self.lateralControl == True: #if statement to implement autonomous lateral control
             #first need to get the world to pass in to latPID control so that the map can be accessed
             #self._control.steer = latPID(vehicle, world.world, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath) 
@@ -609,20 +607,6 @@ class KeyboardControl(object):
                 ##
             print(self.rightLaneChange)
             
-
-            ##need to make desired and actual paths global
-            #global x_desiredPath 
-            #global y_desiredPath 
-            #global x_actualPath 
-            #global y_actualPath
-
-            #self._control.steer, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath = latPID(vehicle, wrld, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath) 
-
-            #need to store the coordinates in the desire and actual path variables
-            #x_desiredPath = self.x_desiredPath
-            #y_desiredPath = self.y_desiredPath
-            #x_actualPath = self.x_actualPath
-            #y_actualPath = self.y_actualPath
 
         else:
             ##this was the original steering control command -- there was no if/else statement here before
@@ -1325,17 +1309,17 @@ if __name__ == '__main__':
     
     main()
 
+
+    
 from matplotlib import pyplot as plt 
 
 ## this code plots the coordinates for the desired and actual paths
 fig = plt.figure()
 plot = plt.subplot(111)
-plt.title("Desired Path vs Actual Path")
+plt.title("Vehicle's Path of Travel")
 plt.xlabel("x-coordinate")
 plt.ylabel("y-coordinate")
-plot.plot(x_desiredPath,y_desiredPath, 'k', linewidth = 2, label = 'Desired Path')
-plot.plot(x_actualPath,y_actualPath, '--r',label = 'Actual Path',)
+plot.plot(vehicle_location_x, vehicle_location_y, 'ko', linewidth = 3, label = 'Stationary Vehicles')
+plot.plot(x_actualPath,y_actualPath, 'r',label = "Vehicle's Path")
 plot.legend()
-
-plt.show() 
-
+plt.show()
