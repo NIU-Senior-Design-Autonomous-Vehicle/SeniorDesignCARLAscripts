@@ -29,28 +29,46 @@ import time
 
 
 def obs():
-        client = carla.Client('localhost', 2000)
-        world = client.get_world()
-        spectator = world.get_spectator()
+    client = carla.Client('localhost', 2000)
+    world = client.get_world()
+    spectator = world.get_spectator()
 
-        vehicle_bp = random.choice(world.get_blueprint_library().filter('vehicle.lincoln.*'))
-        sp = world.get_map().get_spawn_points()
-        spawn = sp[3]
-        i = 1
-        for i in range(1,5):
-            spawn.location.x += 20*i
+    vehicle_bp = random.choice(world.get_blueprint_library().filter('vehicle.lincoln.*'))
+    sp = world.get_map().get_spawn_points()
+    spawn = sp[3]
 
-            vehicle = world.try_spawn_actor(vehicle_bp, spawn)
-        
-        # Wait for world to get the vehicle actor
-        world.tick()
+    vehicle_location_x = []
+    vehicle_location_y = []
 
-        #world_snapshot = world.wait_for_tick()
-        #actor_snapshot = world_snapshot.find(vehicle.id)
+    
+    spawn.location.x += 20
+    vehicle = world.try_spawn_actor(vehicle_bp, spawn)
+    global vehicle_location
+    vehicle_location_x.append(spawn.location.x)
+    vehicle_location_y.append(spawn.location.y)
+    spawn.location.x += 50
+    spawn.location.y += 3.3
+    vehicle = world.try_spawn_actor(vehicle_bp, spawn)
+    global vehicle_location
+    vehicle_location_x.append(spawn.location.x)
+    vehicle_location_y.append(spawn.location.y)
+    spawn.location.x += 50
+    spawn.location.y -= 3.3
+    vehicle = world.try_spawn_actor(vehicle_bp, spawn)
 
-        # Set spectator at given transform (vehicle transform)
-        #spectator.set_transform(actor_snapshot.get_transform())
+    global vehicle_location
+    vehicle_location_x.append(spawn.location.x)
+    vehicle_location_y.append(spawn.location.y)
+    
+    # Wait for world to get the vehicle actor
+    world.tick()
 
+    #world_snapshot = world.wait_for_tick()
+    #actor_snapshot = world_snapshot.find(vehicle.id)
+
+    # Set spectator at given transform (vehicle transform)
+    #spectator.set_transform(actor_snapshot.get_transform())
+    return vehicle_location_x, vehicle_location_y
 if __name__ == '__main__':
 
-    obs()
+    vehicle_location_x, vehicle_location_y = obs() 

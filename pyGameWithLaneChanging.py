@@ -164,6 +164,8 @@ def get_actor_display_name(actor, truncate=250):
 
 #global variable vehicle will be used to pass the vehicle into our longPID!!
 vehicle = None
+vehicle_location_x = []
+vehicle_location_y = []
 class World(object):
     
     def __init__(self, carla_world, hud, args):
@@ -174,7 +176,10 @@ class World(object):
         try:
             carla_world = self.client.load_world('Town03') #load world two on start!
             self.map = self.world.get_map()
-            obs()
+            global vehicle_location_x
+            global vehicle_location_y
+            global ob
+            vehicle_location_x, vehicle_location_y = obs()
         except RuntimeError as error:
             print('RuntimeError: {}'.format(error))
             print('  The server could not send the OpenDRIVE (.xodr) file:')
@@ -321,15 +326,12 @@ y_actualPath = []
 class KeyboardControl(object):
     """Class that handles keyboard input."""
     def __init__(self, world, start_in_autopilot):
-        self.hi = 1
+        self.hi = 3
         self.cruiseControl = True #boolean for CC
         self.lateralControl = True #boolean for lateral control -- want autonomous lane keeping to be turned on
         self.leftLaneChange = False #boolean for changing into left lane -- only activated when 'a' key is pressed
         self.rightLaneChange = False #boolean for changing into right lane -- only activated when 'd' key is pressed
         self.player = vehicle #our vehicle variable!
-        self.count = 0 #this count is for knowing when the vehicle should set 'self.laneChange' to False after it has been set True
-        self.x_desiredPath = [] ##I could confused how the global/local variables worked, and I needed to declare these desired and 
-        self.y_desiredPath = [] ## actual path variables here to pass into the latPID function 
         self.x_actualPath = []
         self.y_actualPath = []
         self._autopilot_enabled = start_in_autopilot
@@ -558,16 +560,12 @@ class KeyboardControl(object):
 
 
             #need to make desired and actual paths global
-            global x_desiredPath 
-            global y_desiredPath 
             global x_actualPath 
             global y_actualPath
 
-            self._control.steer, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath = latPID(vehicle, wrld, self.leftLaneChange, self.rightLaneChange, self.count, self.x_desiredPath, self.y_desiredPath, self.x_actualPath, self.y_actualPath) 
+            self._control.steer, self.leftLaneChange, self.rightLaneChange, self.x_actualPath, self.y_actualPath = latPID(vehicle, wrld, self.leftLaneChange, self.rightLaneChange, self.x_actualPath, self.y_actualPath) 
 
             #need to store the coordinates in the desire and actual path variables
-            x_desiredPath = self.x_desiredPath
-            y_desiredPath = self.y_desiredPath
             x_actualPath = self.x_actualPath
             y_actualPath = self.y_actualPath
             
@@ -587,18 +585,35 @@ class KeyboardControl(object):
                 print(d)
                 #lets try it 
                 print(self.hi)
-                if d < 15 and d > 8 and self.hi%2 ==1:
+                if d < 15 and d > 8 and self.hi == 3:
                     self.rightLaneChange = True
-                    self.hi +=1
+                    
                     print(self.hi)
                     print('lane change initiated!!')
                     print(self.rightLaneChange)
-                elif d < 6:
+                elif d < 6 and d > 4:
                     self.rightLaneChange = False   
+                elif d < 4 and self.hi == 3: 
+                    self.hi = 4
+                elif d > 20 and d < 21 and self.hi == 4:
+                    self.hi = 7
                     
-                
+                if d < 15 and d > 8 and self.hi == 7:
+                    self.leftLaneChange = True
+                    
+                    print(self.hi)
+                    print('lane change initiated!!')
+                    print(self.leftLaneChange)
+                elif d < 6 and d > 4:
+                    self.leftLaneChange = False   
+                elif d < 4 and self.hi == 7:
+                    self.hi = 5
+                elif d > 20 and d < 21 and self.hi == 5:
+                    self.hi = 3
                 ##
-            print(self.rightLaneChange)
+                
+            print(self.leftLaneChange)
+            
             
         else:
             ##this was the original steering control command -- there was no if/else statement here before
@@ -1307,10 +1322,10 @@ from matplotlib import pyplot as plt
 ## this code plots the coordinates for the desired and actual paths
 fig = plt.figure()
 plot = plt.subplot(111)
-plt.title("Desired Path vs Actual Path")
+plt.title("Vehicle's Path of Travel")
 plt.xlabel("x-coordinate")
 plt.ylabel("y-coordinate")
-plot.plot(x_desiredPath,y_desiredPath, 'k', linewidth = 2, label = 'Desired Path')
-plot.plot(x_actualPath,y_actualPath, '--r',label = 'Actual Path',)
+plot.plot(vehicle_location_x, vehicle_location_y, 'ko', linewidth = 3, label = 'Stationary Vehicles')
+plot.plot(x_actualPath,y_actualPath, 'r',label = "Vehicle's Path")
 plot.legend()
 plt.show() 
